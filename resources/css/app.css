@@ -1,0 +1,6 @@
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+@import "@toast-ui/editor/dist/toastui-editor.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
