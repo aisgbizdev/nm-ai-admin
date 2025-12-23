@@ -34,7 +34,7 @@ class KnowledgeApiController extends Controller
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'answer' => ['required', 'string'], // markdown boleh
+            'answer' => ['required', 'string'],
             'source' => ['nullable', 'string'],
         ]);
 
@@ -42,16 +42,6 @@ class KnowledgeApiController extends Controller
             'title' => $validated['title'],
             'answer' => $validated['answer'],
             'source' => $validated['source'],
-
-            // pending (belum publish)
-            'is_published' => 0,
-
-            // optional kalau pakai auth (kalau gak ada auth, bakal null dan aman)
-            'created_by' => auth()->check() ? auth()->id() : null,
-
-            // pending approval
-            'approved_by' => null,
-            'approved_at' => null,
         ]);
 
         return response()->json([

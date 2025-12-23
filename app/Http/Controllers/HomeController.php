@@ -23,7 +23,7 @@ class HomeController extends Controller
 
         $publishedEntries = KnowledgeEntry::where('is_published', true)->count();
         $draftEntries = KnowledgeEntry::where('is_published', false)->count();
-        $pendingSuggestions = KnowledgeSuggestion::whereNull('approved_at')->count();
+        $pendingSuggestions = KnowledgeSuggestion::count();
 
         $stats = $isSuperadmin
             ? $this->superadminStats($publishedEntries, $pendingSuggestions)

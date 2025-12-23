@@ -109,8 +109,7 @@
                                                 class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
                                                 data-approve
                                                 data-action="{{ route('knowledge.suggestions.approve', $s->id) }}"
-                                                data-title="{{ $s->title }}"
-                                                data-answer="{{ $s->answer }}"
+                                                data-title="{{ $s->title }}" data-answer="{{ $s->answer }}"
                                                 data-source="{{ $s->source ?? 'manual' }}">
                                                 Approve
                                             </button>

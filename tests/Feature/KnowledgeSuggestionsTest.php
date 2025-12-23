@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\KnowledgeSuggestion;
 use App\Models\KnowledgeEntry;
+use App\Models\KnowledgeSuggestion;
 use App\Models\User;
 
 it('rejects all pending suggestions in bulk', function () {
@@ -10,6 +10,10 @@ it('rejects all pending suggestions in bulk', function () {
     ]);
 
     $suggestions = KnowledgeSuggestion::factory()->count(3)->create();
+    $processed = KnowledgeSuggestion::factory()->create([
+        'approved_at' => now(),
+        'is_published' => false,
+    ]);
 
     $response = $this->actingAs($admin)->post(route('knowledge.suggestions.rejectAll'));
 
@@ -21,6 +25,10 @@ it('rejects all pending suggestions in bulk', function () {
             'id' => $suggestion->id,
         ]);
     });
+
+    $this->assertDatabaseHas('knowledge_suggestions', [
+        'id' => $processed->id,
+    ]);
 });
 
 it('approves a suggestion with edited data', function () {
@@ -45,13 +53,41 @@ it('approves a suggestion with edited data', function () {
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    $this->assertDatabaseHas('knowledge_entries', [
-        'title' => 'New title',
-        'answer' => 'New answer',
-        'source' => 'api',
-    ]);
+    $entry = KnowledgeEntry::query()->where('title', 'New title')->first();
+
+    expect($entry)->not->toBeNull();
+    expect($entry->answer)->toBe('New answer');
+    expect($entry->source)->toBe('api');
+    expect($entry->is_published)->toBeTrue();
+    expect($entry->created_by)->toBe($admin->id);
+    expect($entry->approved_by)->toBe($admin->id);
+    expect($entry->approved_at)->not->toBeNull();
 
     $this->assertDatabaseMissing('knowledge_suggestions', [
         'id' => $suggestion->id,
     ]);
+});
+
+it('rejects a suggestion and marks it processed', function () {
+    $admin = User::factory()->create([
+        'role' => 'Admin',
+    ]);
+
+    $suggestion = KnowledgeSuggestion::factory()->create([
+        'is_published' => true,
+        'approved_at' => null,
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('knowledge.suggestions.reject', $suggestion));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+
+    $this->assertDatabaseHas('knowledge_suggestions', [
+        'id' => $suggestion->id,
+        'is_published' => false,
+        'approved_by' => $admin->id,
+    ]);
+
+    $this->assertNotNull($suggestion->fresh()->approved_at);
 });

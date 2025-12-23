@@ -116,12 +116,6 @@ class KnowledgeEntryController extends Controller
             $entry->answer = $data['answer'];
             $entry->source = $data['source'];
             $entry->is_published = $request->boolean('is_published', true);
-            $entry->created_by = auth()->id();
-
-            if ($entry->is_published) {
-                $entry->approved_by = auth()->id();
-                $entry->approved_at = now();
-            }
 
             $entry->save();
 
@@ -155,11 +149,6 @@ class KnowledgeEntryController extends Controller
             $entry->source = $data['source'];
             $entry->is_published = $request->boolean('is_published', true);
 
-            if ($entry->is_published && ! $entry->approved_at) {
-                $entry->approved_by = auth()->id();
-                $entry->approved_at = now();
-            }
-
             $entry->save();
 
             return redirect()
@@ -174,8 +163,6 @@ class KnowledgeEntryController extends Controller
 
         return DB::transaction(function () use ($entry) {
             $entry->is_published = true;
-            $entry->approved_by = auth()->id();
-            $entry->approved_at = now();
             $entry->save();
 
             return back()->with('success', 'Entry berhasil di-approve & dipublish.');
@@ -214,8 +201,7 @@ class KnowledgeEntryController extends Controller
 
         $q = trim((string) $request->get('q', ''));
 
-        $suggestions = KnowledgeSuggestion::query()
-            ->whereNull('approved_at') // pending = belum diproses
+        $suggestions = KnowledgeSuggestion::query() // pending = belum diproses
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('title', 'like', "%{$q}%")
@@ -244,29 +230,23 @@ class KnowledgeEntryController extends Controller
         ]);
 
         return DB::transaction(function () use ($suggestion, $data) {
-            // kalau udah diproses (approved_at kepake di sistem lama), stop
             if ($suggestion->approved_at) {
                 return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
             }
 
-            // 1) copy ke entries
-            $entry = new KnowledgeEntry;
-            $entry->title = $data['title'];
-            $entry->answer = $data['answer'];
-            $entry->source = $data['source'] ?? 'manual';
-            $entry->is_published = true;
+            KnowledgeEntry::query()->create([
+                'title' => $data['title'],
+                'answer' => $data['answer'],
+                'source' => $data['source'] ?? 'manual',
+                'is_published' => true,
+            ]);
 
-            // created_by: prefer dari suggestion, fallback approver
-            $entry->created_by = $suggestion->created_by ?? auth()->id();
-
-            $entry->approved_by = auth()->id();
-            $entry->approved_at = now();
-            $entry->save();
-
-            // 2) HAPUS suggestion (biar list pending bersih)
             $suggestion->delete();
 
-            return back()->with('success', 'Suggestion berhasil di-approve dan dipindahkan ke Knowledge Entries.');
+            return back()->with(
+                'success',
+                'Suggestion berhasil di-approve dan dipublish ke Knowledge Entries.'
+            );
         });
     }
 
@@ -282,7 +262,7 @@ class KnowledgeEntryController extends Controller
                 return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
             }
 
-            $suggestion->is_published = 0;
+            $suggestion->is_published = false;
             $suggestion->approved_by = auth()->id();
             $suggestion->approved_at = now();
             $suggestion->save();
