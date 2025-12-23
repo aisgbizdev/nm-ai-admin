@@ -16,6 +16,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/create', [KnowledgeEntryController::class, 'create'])->name('knowledge.create');
         Route::post('/', [KnowledgeEntryController::class, 'store'])->name('knowledge.store');
 
+        Route::get('/drafts', [KnowledgeEntryController::class, 'drafts'])->name('knowledge.drafts');
+
         Route::get('/{entry}/edit', [KnowledgeEntryController::class, 'edit'])->name('knowledge.edit');
         Route::put('/{entry}', [KnowledgeEntryController::class, 'update'])->name('knowledge.update');
 

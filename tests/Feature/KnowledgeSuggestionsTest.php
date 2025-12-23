@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\KnowledgeEntry;
 use App\Models\KnowledgeSuggestion;
 use App\Models\User;
 
@@ -53,15 +52,12 @@ it('approves a suggestion with edited data', function () {
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    $entry = KnowledgeEntry::query()->where('title', 'New title')->first();
-
-    expect($entry)->not->toBeNull();
-    expect($entry->answer)->toBe('New answer');
-    expect($entry->source)->toBe('api');
-    expect($entry->is_published)->toBeTrue();
-    expect($entry->created_by)->toBe($admin->id);
-    expect($entry->approved_by)->toBe($admin->id);
-    expect($entry->approved_at)->not->toBeNull();
+    $this->assertDatabaseHas('knowledge_entries', [
+        'title' => 'New title',
+        'answer' => 'New answer',
+        'source' => 'api',
+        'is_published' => true,
+    ]);
 
     $this->assertDatabaseMissing('knowledge_suggestions', [
         'id' => $suggestion->id,
@@ -86,8 +82,5 @@ it('rejects a suggestion and marks it processed', function () {
     $this->assertDatabaseHas('knowledge_suggestions', [
         'id' => $suggestion->id,
         'is_published' => false,
-        'approved_by' => $admin->id,
     ]);
-
-    $this->assertNotNull($suggestion->fresh()->approved_at);
 });

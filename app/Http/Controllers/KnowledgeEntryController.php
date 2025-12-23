@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\KnowledgeEntryStoreRequest;
+use App\Http\Requests\KnowledgeEntryUpdateRequest;
+use App\Http\Requests\KnowledgeSuggestionApproveRequest;
 use App\Models\KnowledgeEntry;
 use App\Models\KnowledgeSuggestion;
+use App\Services\KnowledgeEntryService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class KnowledgeEntryController extends Controller
 {
+    public function __construct(private KnowledgeEntryService $knowledgeEntryService) {}
+
     private function ensureInternalApprover(): void
     {
         abort_unless(auth()->check(), 401);
@@ -18,174 +24,120 @@ class KnowledgeEntryController extends Controller
         abort_unless(in_array($role, ['Superadmin', 'Admin'], true), 403);
     }
 
-    // =========================
-    // ENTRIES (knowledge_entries)
-    // =========================
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         $this->ensureInternalApprover();
 
         $q = trim((string) $request->get('q', ''));
         $published = $request->get('published'); // 1|0|null
 
-        $entries = KnowledgeEntry::query()
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('title', 'like', "%{$q}%")
-                        ->orWhere('answer', 'like', "%{$q}%")
-                        ->orWhere('source', 'like', "%{$q}%");
-                });
-            })
-            ->when($published !== null && $published !== '', fn ($query) => $query->where('is_published', (bool) $published))
-            ->orderByDesc('updated_at')
-            ->paginate(15)
-            ->withQueryString();
-
-        $palette = [
-            'bg-blue-50 text-blue-700',
-            'bg-indigo-50 text-indigo-700',
-            'bg-emerald-50 text-emerald-700',
-            'bg-amber-50 text-amber-700',
-            'bg-rose-50 text-rose-700',
-            'bg-violet-50 text-violet-700',
-        ];
-
-        $collections = KnowledgeEntry::query()
-            ->select('source', DB::raw('count(*) as total'), DB::raw('max(updated_at) as last_update'))
-            ->groupBy('source')
-            ->orderByDesc('total')
-            ->get()
-            ->map(function ($row) use ($palette) {
-                $source = $row->source ?: 'manual';
-                $idx = abs(crc32((string) $source)) % count($palette);
-
-                return [
-                    'title' => ucfirst($source),
-                    'desc' => 'Dokumen dengan sumber '.$source,
-                    'count' => $row->total,
-                    'updated' => $row->last_update ? \Carbon\Carbon::parse($row->last_update)->diffForHumans() : '-',
-                    'tags' => [],
-                    'color' => $palette[$idx],
-                ];
-            })
-            ->values()
-            ->all();
-
-        $recent = KnowledgeEntry::query()
-            ->where('is_published', true)
-            ->orderByDesc('updated_at')
-            ->limit(4)
-            ->get(['title', 'source', 'updated_at'])
-            ->map(function ($e) {
-                return [
-                    'title' => $e->title,
-                    'owner' => ucfirst($e->source ?? 'manual'),
-                    'time' => $e->updated_at ? $e->updated_at->diffForHumans() : '-',
-                ];
-            })
-            ->values()
-            ->all();
+        [
+            'entries' => $entries,
+            'collections' => $collections,
+            'recent' => $recent,
+            'count' => $count,
+            'countDraft' => $countDraft
+        ] = $this->knowledgeEntryService->getIndexData($q, $published);
 
         return view('knowledge.index', compact(
             'entries', 'q', 'published',
-            'collections', 'recent'
+            'collections', 'recent', 'count', 'countDraft'
         ));
     }
 
-    public function create()
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create(): View
     {
         $this->ensureInternalApprover();
 
         return view('knowledge.create');
     }
 
-    public function store(Request $request)
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(KnowledgeEntryStoreRequest $request): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:180'],
-            'answer' => ['required', 'string'],
-            'source' => ['required', 'string', 'max:255'],
-            'is_published' => ['nullable', 'boolean'],
-        ]);
+        $this->knowledgeEntryService->createEntry(
+            $request->validated(),
+            (int) auth()->id()
+        );
 
-        return DB::transaction(function () use ($data, $request) {
-            $entry = new KnowledgeEntry;
-            $entry->title = $data['title'];
-            $entry->answer = $data['answer'];
-            $entry->source = $data['source'];
-            $entry->is_published = $request->boolean('is_published', true);
-
-            $entry->save();
-
-            return redirect()
-                ->route('knowledge.index')
-                ->with('success', 'Knowledge berhasil dibuat.');
-        });
+        return redirect()
+            ->route('knowledge.index')
+            ->with('success', 'Knowledge berhasil dibuat.');
     }
 
-    public function edit(KnowledgeEntry $entry)
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(KnowledgeEntry $entry): View
     {
         $this->ensureInternalApprover();
 
         return view('knowledge.edit', compact('entry'));
     }
 
-    public function update(Request $request, KnowledgeEntry $entry)
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(KnowledgeEntryUpdateRequest $request, KnowledgeEntry $entry): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:180'],
-            'answer' => ['required', 'string'],
-            'source' => ['required', 'string', 'max:255'],
-            'is_published' => ['nullable', 'boolean'],
-        ]);
+        $this->knowledgeEntryService->updateEntry(
+            $entry,
+            $request->validated(),
+            (int) auth()->id()
+        );
 
-        return DB::transaction(function () use ($data, $entry, $request) {
-            $entry->title = $data['title'];
-            $entry->answer = $data['answer'];
-            $entry->source = $data['source'];
-            $entry->is_published = $request->boolean('is_published', true);
-
-            $entry->save();
-
-            return redirect()
-                ->route('knowledge.index')
-                ->with('success', 'Knowledge berhasil diupdate.');
-        });
+        return redirect()
+            ->route('knowledge.index')
+            ->with('success', 'Knowledge berhasil diupdate.');
     }
 
-    public function approve(KnowledgeEntry $entry)
+    public function approve(KnowledgeEntry $entry): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        return DB::transaction(function () use ($entry) {
-            $entry->is_published = true;
-            $entry->save();
+        $this->knowledgeEntryService->approveEntry($entry, (int) auth()->id());
 
-            return back()->with('success', 'Entry berhasil di-approve & dipublish.');
-        });
+        return back()->with('success', 'Entry berhasil di-approve & dipublish.');
     }
 
-    public function toggleActive(KnowledgeEntry $entry)
+    public function toggleActive(KnowledgeEntry $entry): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        $entry->is_published = ! $entry->is_published;
-        $entry->save();
+        $this->knowledgeEntryService->toggleActive($entry, (int) auth()->id());
 
         return back()->with('success', 'Status aktif berhasil diubah.');
     }
 
-    public function destroy(KnowledgeEntry $entry)
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(KnowledgeEntry $entry): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        $entry->delete();
+        $this->knowledgeEntryService->deleteEntry($entry);
 
         return back()->with('success', 'Entry berhasil dihapus.');
+    }
+
+    public function drafts(Request $request): View
+    {
+        $this->ensureInternalApprover();
+
+        $q = trim((string) $request->get('q', ''));
+        $drafts = $this->knowledgeEntryService->getDraftEntries($q);
+
+        return view('knowledge.drafts', compact('drafts', 'q'));
     }
 
     // ==================================
@@ -195,13 +147,13 @@ class KnowledgeEntryController extends Controller
     /**
      * List pending suggestions (belum diproses)
      */
-    public function suggestions(Request $request)
+    public function suggestions(Request $request): View
     {
         $this->ensureInternalApprover();
 
         $q = trim((string) $request->get('q', ''));
 
-        $suggestions = KnowledgeSuggestion::query() // pending = belum diproses
+        $suggestions = KnowledgeSuggestion::query()
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($qq) use ($q) {
                     $qq->where('title', 'like', "%{$q}%")
@@ -219,56 +171,40 @@ class KnowledgeEntryController extends Controller
     /**
      * Approve suggestion -> copy ke knowledge_entries, lalu HAPUS dari knowledge_suggestions
      */
-    public function approveSuggestion(Request $request, KnowledgeSuggestion $suggestion)
+    public function approveSuggestion(KnowledgeSuggestionApproveRequest $request, KnowledgeSuggestion $suggestion): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:180'],
-            'answer' => ['required', 'string'],
-            'source' => ['required', 'string', 'max:255'],
-        ]);
+        $entry = $this->knowledgeEntryService->approveSuggestion(
+            $suggestion,
+            $request->validated(),
+            (int) auth()->id()
+        );
 
-        return DB::transaction(function () use ($suggestion, $data) {
-            if ($suggestion->approved_at) {
-                return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
-            }
+        if ($entry === null) {
+            return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
+        }
 
-            KnowledgeEntry::query()->create([
-                'title' => $data['title'],
-                'answer' => $data['answer'],
-                'source' => $data['source'] ?? 'manual',
-                'is_published' => true,
-            ]);
-
-            $suggestion->delete();
-
-            return back()->with(
-                'success',
-                'Suggestion berhasil di-approve dan dipublish ke Knowledge Entries.'
-            );
-        });
+        return back()->with(
+            'success',
+            'Suggestion berhasil di-approve dan dipublish ke Knowledge Entries.'
+        );
     }
 
     /**
      * Reject suggestion (tandai diproses tapi tetap tidak publish)
      */
-    public function rejectSuggestion(KnowledgeSuggestion $suggestion)
+    public function rejectSuggestion(KnowledgeSuggestion $suggestion): RedirectResponse
     {
         $this->ensureInternalApprover();
 
-        return DB::transaction(function () use ($suggestion) {
-            if ($suggestion->approved_at) {
-                return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
-            }
+        $rejected = $this->knowledgeEntryService->rejectSuggestion($suggestion, (int) auth()->id());
 
-            $suggestion->is_published = false;
-            $suggestion->approved_by = auth()->id();
-            $suggestion->approved_at = now();
-            $suggestion->save();
+        if (! $rejected) {
+            return back()->with('success', 'Suggestion sudah diproses sebelumnya.');
+        }
 
-            return back()->with('success', 'Suggestion berhasil ditolak.');
-        });
+        return back()->with('success', 'Suggestion berhasil ditolak.');
     }
 
     /**
@@ -278,18 +214,12 @@ class KnowledgeEntryController extends Controller
     {
         $this->ensureInternalApprover();
 
-        $pendingCount = KnowledgeSuggestion::whereNull('approved_at')->count();
+        $pendingCount = $this->knowledgeEntryService->rejectAllPendingSuggestions();
 
         if ($pendingCount === 0) {
             return back()->with('success', 'Tidak ada suggestion pending.');
         }
 
-        return DB::transaction(function () use ($pendingCount): RedirectResponse {
-            KnowledgeSuggestion::query()
-                ->whereNull('approved_at')
-                ->delete();
-
-            return back()->with('success', "Semua suggestion pending ({$pendingCount}) berhasil dihapus.");
-        });
+        return back()->with('success', "Semua suggestion pending ({$pendingCount}) berhasil dihapus.");
     }
 }

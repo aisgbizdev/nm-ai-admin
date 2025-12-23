@@ -34,6 +34,17 @@
                     </div>
 
                     <div class="space-y-1">
+                        <label class="text-sm font-semibold text-gray-700" for="username">Username</label>
+                        <input id="username" name="username" type="text" value="{{ old('username') }}" required
+                            class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300">
+                        @error('username')
+                            <p class="text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
                         <label class="text-sm font-semibold text-gray-700" for="email">Email</label>
                         <input id="email" name="email" type="email" value="{{ old('email') }}" required
                             class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300">
@@ -41,9 +52,6 @@
                             <p class="text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1">
                         <label class="text-sm font-semibold text-gray-700" for="role">Role</label>
                         <select id="role" name="role" required

@@ -4,8 +4,8 @@
 @section('header', __('Knowledge Suggestions'))
 
 @section('content')
-    <div class="py-6 space-y-6">
-        <div class="mx-auto px-6">
+    <div class="py-6 px-6 space-y-6">
+        <div class="mx-auto">
             <div
                 class="bg-white/80 backdrop-blur-lg border border-white/40 shadow-xl rounded-2xl p-6 sm:p-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div class="space-y-2">
@@ -46,7 +46,21 @@
             </div>
         </div>
 
-        <div class="mx-auto px-6">
+        @if (session('success'))
+            <div class="bg-green-50 px-8 py-6 rounded-2xl shadow-lg border-l-4 border-green-500">
+                <div class="flex items-center gap-5">
+                    <div class="p-1 bg-green-200 rounded-full text-xs border border-green-800 text-green-800">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-green-900">Berhasil</span>
+                        <span class="text-green-700">{{ session('success') }}</span>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <div class="mx-auto">
             <div class="bg-white border border-gray-100 rounded-2xl shadow-lg overflow-hidden">
                 <div class="p-4 sm:p-6 border-b border-gray-100 flex items-center justify-between">
                     <div>

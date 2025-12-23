@@ -3,22 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeSuggestion;
-use Illuminate\Http\Request;
+use App\Http\Requests\KnowledgeApiStoreRequest;
+use App\Services\KnowledgeApiService;
+use Illuminate\Http\JsonResponse;
 
 class KnowledgeApiController extends Controller
 {
+    public function __construct(private KnowledgeApiService $knowledgeApiService) {}
+
     /**
      * GET /api/v1/knowledge
      * Ambil knowledge yang sudah publish dari knowledge_entries
      */
-    public function index()
+    public function index(): JsonResponse
     {
-        $knowledge = KnowledgeEntry::query()
-            ->where('is_published', 1)
-            ->orderByDesc('updated_at')
-            ->get();
+        $knowledge = $this->knowledgeApiService->getPublishedKnowledge();
 
         return response()->json([
             'status' => true,
@@ -30,19 +29,9 @@ class KnowledgeApiController extends Controller
      * POST /api/v1/knowledge
      * Submit knowledge baru -> masuk ke knowledge_suggestions dulu (pending review)
      */
-    public function store(Request $request)
+    public function store(KnowledgeApiStoreRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'answer' => ['required', 'string'],
-            'source' => ['nullable', 'string'],
-        ]);
-
-        $suggestion = KnowledgeSuggestion::create([
-            'title' => $validated['title'],
-            'answer' => $validated['answer'],
-            'source' => $validated['source'],
-        ]);
+        $suggestion = $this->knowledgeApiService->storeSuggestion($request->validated());
 
         return response()->json([
             'status' => true,
