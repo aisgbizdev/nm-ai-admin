@@ -170,13 +170,8 @@ class KnowledgeEntryService
 
     public function rejectSuggestion(KnowledgeSuggestion $suggestion, int $userId): bool
     {
-        return DB::transaction(function () use ($suggestion): bool {
-            if ($suggestion->approved_at) {
-                return false;
-            }
-
-            $suggestion->is_published = false;
-            $suggestion->save();
+        return DB::transaction(static function () use ($suggestion): bool {
+            $suggestion->delete();
 
             return true;
         });
@@ -185,14 +180,8 @@ class KnowledgeEntryService
     public function rejectAllPendingSuggestions(): int
     {
         return DB::transaction(static function (): int {
-            $pendingQuery = KnowledgeSuggestion::query()->whereNull('approved_at');
-            $pendingCount = $pendingQuery->count();
-
-            if ($pendingCount === 0) {
-                return 0;
-            }
-
-            $pendingQuery->delete();
+            $pendingCount = KnowledgeSuggestion::query()->count();
+            KnowledgeSuggestion::query()->delete();
 
             return $pendingCount;
         });

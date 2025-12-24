@@ -21,7 +21,6 @@ class KnowledgeApiService
         return KnowledgeSuggestion::query()->create([
             'title' => $data['title'],
             'answer' => $data['answer'],
-            'source' => $data['source'] ?? null,
         ]);
     }
 }

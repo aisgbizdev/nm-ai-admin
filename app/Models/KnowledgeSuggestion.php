@@ -17,20 +17,7 @@ class KnowledgeSuggestion extends Model
         'source',
     ];
 
-    // ✅ Default kalau gak dikirim
     protected $attributes = [
-        'source' => 'ai_generated',
+        'source' => 'Manual',
     ];
-
-    protected static function booted(): void
-    {
-        static::creating(function (self $m) {
-            if (empty($m->source)) {
-                $m->source = 'ai_generated';
-            } else {
-                // rapihin biar konsisten
-                $m->source = strtolower(trim($m->source));
-            }
-        });
-    }
 }

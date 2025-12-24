@@ -47,7 +47,8 @@
         </div>
 
         @if (session('success'))
-            <div class="bg-green-50 px-8 py-6 rounded-2xl shadow-lg border-l-4 border-green-500">
+            <div x-data="{ show: true }" x-init="setTimeout(() => show = false, 5000)" x-show="show" x-transition.opacity
+                class="bg-green-50 px-8 py-6 rounded-2xl shadow-lg border-l-4 border-green-500">
                 <div class="flex items-center gap-5">
                     <div class="p-1 bg-green-200 rounded-full text-xs border border-green-800 text-green-800">
                         <i class="fa-solid fa-check"></i>

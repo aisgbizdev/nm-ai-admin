@@ -29,18 +29,19 @@
                         'text' => __('History Chat'),
                         'active' => 'history.*',
                     ],
-                    [
-                        'href' => route('api.logs'),
-                        'icon' => '<i class="fa-solid fa-notes-medical"></i>',
-                        'text' => __('API Logs'),
-                        'active' => 'api.logs*',
-                    ],
                 ],
             ],
         ];
 
         // Tambah menu khusus Superadmin
         if ($user && $user->role === 'Superadmin') {
+            $menu[1]['items'][] = [
+                'href' => route('api.logs'),
+                'icon' => '<i class="fa-solid fa-clipboard-list"></i>',
+                'text' => __('API Logs'),
+                'active' => 'api.logs*',
+            ];
+
             $menu[] = [
                 'title' => 'Manajemen',
                 'items' => [

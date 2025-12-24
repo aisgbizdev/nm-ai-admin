@@ -120,7 +120,7 @@
                                                 </a>
 
                                                 <button type="button"
-                                                    class="px-3 py-2 rounded-lg text-xs font-semibold {{ $e->is_published === true ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-blue-500 text-white hover:bg-blue-600' }} transition-all"
+                                                    class="px-3 py-2 rounded-lg text-xs font-semibold {{ $e->is_published === true ? 'bg-yellow-500 text-black hover:bg-yellow-600' : 'bg-blue-500 text-white hover:bg-blue-600' }} transition-all"
                                                     data-publish
                                                     data-action="{{ route('knowledge.toggleActive', $e->id) }}"
                                                     data-title="@js($e->title)"
