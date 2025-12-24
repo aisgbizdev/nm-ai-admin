@@ -9,7 +9,9 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
+use SplFileInfo;
 
 class HomeController extends Controller
 {
@@ -33,7 +35,10 @@ class HomeController extends Controller
             ? $this->superadminActivities()
             : $this->adminActivities();
 
-        return view('dashboard', compact('user', 'stats', 'activities', 'isSuperadmin'));
+        $knowledgeSources = $this->knowledgeSourceDistribution();
+        $apiRequests = $this->apiRequestBreakdown();
+
+        return view('dashboard', compact('user', 'stats', 'activities', 'isSuperadmin', 'knowledgeSources', 'apiRequests'));
     }
 
     private function superadminStats(int $publishedEntries, int $pendingSuggestions): array
@@ -142,5 +147,95 @@ class HomeController extends Controller
                     'status' => $entry->is_published ? 'Published' : 'Draft',
                 ];
             });
+    }
+
+    private function knowledgeSourceDistribution(): Collection
+    {
+        $total = KnowledgeEntry::count();
+
+        return KnowledgeEntry::query()
+            ->selectRaw('COALESCE(NULLIF(source, \'\'), ?) as label, COUNT(*) as total', ['manual'])
+            ->groupBy('label')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row) => [
+                'label' => ucfirst($row->label),
+                'total' => (int) $row->total,
+                'percent' => $total > 0 ? round($row->total / $total * 100, 1) : 0,
+            ]);
+    }
+
+    private function apiRequestBreakdown(): array
+    {
+        $since = Carbon::now()->subDays(30);
+
+        $files = collect(File::files(storage_path('logs')))
+            ->filter(fn (SplFileInfo $file) => str_contains($file->getFilename(), 'api-') && Carbon::createFromTimestamp($file->getMTime())->greaterThanOrEqualTo($since));
+
+        $methodTotals = [];
+        $daily = [];
+
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $matchedDate = null;
+
+            if (preg_match('/api-(\d{4}-\d{2}-\d{2})\.log$/', $filename, $matches)) {
+                $matchedDate = $matches[1];
+            }
+
+            $dateKey = $matchedDate ?? Carbon::createFromTimestamp($file->getMTime())->toDateString();
+
+            foreach (file($file->getPathname()) as $line) {
+                $jsonPosition = strpos($line, '{');
+
+                if ($jsonPosition === false) {
+                    continue;
+                }
+
+                $payload = json_decode(substr($line, $jsonPosition), true);
+
+                if (! is_array($payload) || ! isset($payload['method'])) {
+                    continue;
+                }
+
+                $method = strtoupper($payload['method']);
+
+                $methodTotals[$method] = ($methodTotals[$method] ?? 0) + 1;
+                $daily[$dateKey][$method] = ($daily[$dateKey][$method] ?? 0) + 1;
+            }
+        }
+
+        $totalCount = array_sum($methodTotals);
+
+        $methods = collect($methodTotals)
+            ->sortDesc()
+            ->map(fn (int $count, string $method) => [
+                'method' => $method,
+                'count' => $count,
+                'percent' => $totalCount > 0 ? round(($count / $totalCount) * 100, 1) : 0,
+            ])
+            ->values();
+
+        $dailySeries = collect($daily)
+            ->sortKeys()
+            ->map(function (array $counts, string $date) {
+                $get = $counts['GET'] ?? 0;
+                $post = $counts['POST'] ?? 0;
+
+                return [
+                    'date' => $date,
+                    'get' => $get,
+                    'post' => $post,
+                    'total' => $get + $post,
+                ];
+            })
+            ->values();
+
+        return [
+            'total' => $totalCount,
+            'methods' => $methods,
+            'range_label' => '30 hari terakhir',
+            'daily' => $dailySeries,
+        ];
     }
 }

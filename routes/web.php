@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\FirestoreHistoryController;
+use App\Http\Controllers\ApiLogController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\KnowledgeEntryController;
@@ -39,6 +40,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::post('/suggestions/{suggestion}/reject', [KnowledgeEntryController::class, 'rejectSuggestion'])
             ->name('knowledge.suggestions.reject');
+    });
+
+    Route::prefix('api-logs')->group(function () {
+        Route::get('/', [ApiLogController::class, 'index'])->name('api.logs');
+        Route::get('/{file}', [ApiLogController::class, 'show'])->name('api.logs.show');
     });
 
     Route::middleware(['role:Superadmin'])->controller(UserController::class)->prefix('admin')->name('admin.')->group(function () {

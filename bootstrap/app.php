@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'bearer' => \App\Http\Middleware\BearerTokenMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'api.monitoring' => \App\Http\Middleware\ApiMonitoringMiddleware::class,
+        ]);
+
+        $middleware->api(prepend: [
+            \App\Http\Middleware\ApiMonitoringMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

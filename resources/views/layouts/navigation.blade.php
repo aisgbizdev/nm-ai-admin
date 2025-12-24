@@ -29,6 +29,12 @@
                         'text' => __('History Chat'),
                         'active' => 'history.*',
                     ],
+                    [
+                        'href' => route('api.logs'),
+                        'icon' => '<i class="fa-solid fa-notes-medical"></i>',
+                        'text' => __('API Logs'),
+                        'active' => 'api.logs*',
+                    ],
                 ],
             ],
         ];
